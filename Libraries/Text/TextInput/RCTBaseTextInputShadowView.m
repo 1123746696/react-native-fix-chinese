@@ -23,6 +23,7 @@
   NSAttributedString *_Nullable _localAttributedText;
   CGSize _previousContentSize;
 
+  NSString *_text;
   NSTextStorage *_textStorage;
   NSTextContainer *_textContainer;
   NSLayoutManager *_layoutManager;
@@ -44,6 +45,15 @@
 - (BOOL)isYogaLeafNode
 {
   return YES;
+}
+
+- (NSString *)text{
+  return _text;
+}
+
+- (void)setText:(NSString *)text{
+  _text = text;
+  _previousAttributedText = _localAttributedText;
 }
 
 - (void)layoutSubviewsWithContext:(RCTLayoutContext)layoutContext
