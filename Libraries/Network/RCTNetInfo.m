@@ -8,7 +8,7 @@
 #import "RCTNetInfo.h"
 
 #if !TARGET_OS_TV
-  #import <CoreTelephony/CTTelephonyNetworkInfo.h>
+#import <CoreTelephony/CTTelephonyNetworkInfo.h>
 #endif
 #import <React/RCTAssert.h>
 #import <React/RCTBridge.h>
@@ -36,126 +36,126 @@ static NSString *const RCTReachabilityStateCell = @"cell";
 
 @implementation RCTNetInfo
 {
-  SCNetworkReachabilityRef _reachability;
-  NSString *_connectionType;
-  NSString *_effectiveConnectionType;
-  NSString *_statusDeprecated;
-  NSString *_host;
-  BOOL _isObserving;
+    SCNetworkReachabilityRef _reachability;
+    NSString *_connectionType;
+    NSString *_effectiveConnectionType;
+    NSString *_statusDeprecated;
+    NSString *_host;
+    BOOL _isObserving;
 }
 
 RCT_EXPORT_MODULE()
 
 static void RCTReachabilityCallback(__unused SCNetworkReachabilityRef target, SCNetworkReachabilityFlags flags, void *info)
 {
-  RCTNetInfo *self = (__bridge id)info;
-  if ([self setReachabilityStatus:flags] && self->_isObserving) {
-    [self sendEventWithName:@"networkStatusDidChange" body:@{@"connectionType": self->_connectionType,
-                                                             @"effectiveConnectionType": self->_effectiveConnectionType,
-                                                             @"network_info": self->_statusDeprecated}];
-  }
+    RCTNetInfo *self = (__bridge id)info;
+    if ([self setReachabilityStatus:flags] && self->_isObserving) {
+        [self sendEventWithName:@"networkStatusDidChange" body:@{@"connectionType": self->_connectionType,
+                                                                 @"effectiveConnectionType": self->_effectiveConnectionType,
+                                                                 @"network_info": self->_statusDeprecated}];
+    }
 }
 
 #pragma mark - Lifecycle
 
 - (instancetype)initWithHost:(NSString *)host
 {
-  RCTAssertParam(host);
-  RCTAssert(![host hasPrefix:@"http"], @"Host value should just contain the domain, not the URL scheme.");
-
-  if ((self = [self init])) {
-    _host = [host copy];
-  }
-  return self;
+    RCTAssertParam(host);
+    RCTAssert(![host hasPrefix:@"http"], @"Host value should just contain the domain, not the URL scheme.");
+    
+    if ((self = [self init])) {
+        _host = [host copy];
+    }
+    return self;
 }
 
 - (NSArray<NSString *> *)supportedEvents
 {
-  return @[@"networkStatusDidChange"];
+    return @[@"networkStatusDidChange"];
 }
 
 - (void)startObserving
 {
-  _isObserving = YES;
-  _connectionType = RCTConnectionTypeUnknown;
-  _effectiveConnectionType = RCTEffectiveConnectionTypeUnknown;
-  _statusDeprecated = RCTReachabilityStateUnknown;
-  _reachability = [self getReachabilityRef];
+    _isObserving = YES;
+    _connectionType = RCTConnectionTypeUnknown;
+    _effectiveConnectionType = RCTEffectiveConnectionTypeUnknown;
+    _statusDeprecated = RCTReachabilityStateUnknown;
+    _reachability = [self getReachabilityRef];
 }
 
 - (void)stopObserving
 {
-  _isObserving = NO;
-  if (_reachability) {
-    SCNetworkReachabilityUnscheduleFromRunLoop(_reachability, CFRunLoopGetMain(), kCFRunLoopCommonModes);
-    CFRelease(_reachability);
-  }
+    _isObserving = NO;
+    if (_reachability) {
+        SCNetworkReachabilityUnscheduleFromRunLoop(_reachability, CFRunLoopGetMain(), kCFRunLoopCommonModes);
+        CFRelease(_reachability);
+    }
 }
 
 - (SCNetworkReachabilityRef)getReachabilityRef
 {
-  SCNetworkReachabilityRef reachability = SCNetworkReachabilityCreateWithName(kCFAllocatorDefault, _host.UTF8String ?: "apple.com");
-  SCNetworkReachabilityContext context = { 0, ( __bridge void *)self, NULL, NULL, NULL };
-  SCNetworkReachabilitySetCallback(reachability, RCTReachabilityCallback, &context);
-  SCNetworkReachabilityScheduleWithRunLoop(reachability, CFRunLoopGetMain(), kCFRunLoopCommonModes);
+    SCNetworkReachabilityRef reachability = SCNetworkReachabilityCreateWithName(kCFAllocatorDefault, _host.UTF8String ?: "apple.com");
+    SCNetworkReachabilityContext context = { 0, ( __bridge void *)self, NULL, NULL, NULL };
+    SCNetworkReachabilitySetCallback(reachability, RCTReachabilityCallback, &context);
+    SCNetworkReachabilityScheduleWithRunLoop(reachability, CFRunLoopGetMain(), kCFRunLoopCommonModes);
     
-  return reachability;
+    return reachability;
 }
 
 - (BOOL)setReachabilityStatus:(SCNetworkReachabilityFlags)flags
 {
-  NSString *connectionType = RCTConnectionTypeUnknown;
-  NSString *effectiveConnectionType = RCTEffectiveConnectionTypeUnknown;
-  NSString *status = RCTReachabilityStateUnknown;
-  if ((flags & kSCNetworkReachabilityFlagsReachable) == 0 ||
-      (flags & kSCNetworkReachabilityFlagsConnectionRequired) != 0) {
-    connectionType = RCTConnectionTypeNone;
-    status = RCTReachabilityStateNone;
-  }
-  
-#if !TARGET_OS_TV
-  
-  else if ((flags & kSCNetworkReachabilityFlagsIsWWAN) != 0) {
-    connectionType = RCTConnectionTypeCellular;
-    status = RCTReachabilityStateCell;
-    
-    CTTelephonyNetworkInfo *netinfo = [[CTTelephonyNetworkInfo alloc] init];
-    if (netinfo) {
-      if ([netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyGPRS] ||
-          [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyEdge] ||
-          [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMA1x]) {
-        effectiveConnectionType = RCTEffectiveConnectionType2g;
-      } else if ([netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyWCDMA] ||
-                 [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyHSDPA] ||
-                 [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyHSUPA] ||
-                 [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMAEVDORev0] ||
-                 [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMAEVDORevA] ||
-                 [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMAEVDORevB] ||
-                 [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyeHRPD]) {
-        effectiveConnectionType = RCTEffectiveConnectionType3g;
-      } else if ([netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyLTE]) {
-        effectiveConnectionType = RCTEffectiveConnectionType4g;
-      }
+    NSString *connectionType = RCTConnectionTypeUnknown;
+    NSString *effectiveConnectionType = RCTEffectiveConnectionTypeUnknown;
+    NSString *status = RCTReachabilityStateUnknown;
+    if ((flags & kSCNetworkReachabilityFlagsReachable) == 0 ||
+        (flags & kSCNetworkReachabilityFlagsConnectionRequired) != 0) {
+        connectionType = RCTConnectionTypeNone;
+        status = RCTReachabilityStateNone;
     }
-  }
-  
+    
+#if !TARGET_OS_TV
+    
+    else if ((flags & kSCNetworkReachabilityFlagsIsWWAN) != 0) {
+        connectionType = RCTConnectionTypeCellular;
+        status = RCTReachabilityStateCell;
+        
+        CTTelephonyNetworkInfo *netinfo = [[CTTelephonyNetworkInfo alloc] init];
+        if (netinfo) {
+            if ([netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyGPRS] ||
+                [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyEdge] ||
+                [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMA1x]) {
+                effectiveConnectionType = RCTEffectiveConnectionType2g;
+            } else if ([netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyWCDMA] ||
+                       [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyHSDPA] ||
+                       [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyHSUPA] ||
+                       [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMAEVDORev0] ||
+                       [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMAEVDORevA] ||
+                       [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyCDMAEVDORevB] ||
+                       [netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyeHRPD]) {
+                effectiveConnectionType = RCTEffectiveConnectionType3g;
+            } else if ([netinfo.currentRadioAccessTechnology isEqualToString:CTRadioAccessTechnologyLTE]) {
+                effectiveConnectionType = RCTEffectiveConnectionType4g;
+            }
+        }
+    }
+    
 #endif
-  
-  else {
-    connectionType = RCTConnectionTypeWifi;
-    status = RCTReachabilityStateWifi;
-  }
-  
-  if (![connectionType isEqualToString:self->_connectionType] ||
-      ![effectiveConnectionType isEqualToString:self->_effectiveConnectionType] ||
-      ![status isEqualToString:self->_statusDeprecated]) {
-    self->_connectionType = connectionType;
-    self->_effectiveConnectionType = effectiveConnectionType;
-    self->_statusDeprecated = status;
-    return YES;
-  }
-  
-  return NO;
+    
+    else {
+        connectionType = RCTConnectionTypeWifi;
+        status = RCTReachabilityStateWifi;
+    }
+    
+    if (![connectionType isEqualToString:self->_connectionType] ||
+        ![effectiveConnectionType isEqualToString:self->_effectiveConnectionType] ||
+        ![status isEqualToString:self->_statusDeprecated]) {
+        self->_connectionType = connectionType;
+        self->_effectiveConnectionType = effectiveConnectionType;
+        self->_statusDeprecated = status;
+        return YES;
+    }
+    
+    return NO;
 }
 
 #pragma mark - Public API
@@ -163,11 +163,12 @@ static void RCTReachabilityCallback(__unused SCNetworkReachabilityRef target, SC
 RCT_EXPORT_METHOD(getCurrentConnectivity:(RCTPromiseResolveBlock)resolve
                   reject:(__unused RCTPromiseRejectBlock)reject)
 {
-  SCNetworkReachabilityRef reachability = [self getReachabilityRef];
-  CFRelease(reachability);
-  resolve(@{@"connectionType": _connectionType ?: RCTConnectionTypeUnknown,
-            @"effectiveConnectionType": _effectiveConnectionType ?: RCTEffectiveConnectionTypeUnknown,
-            @"network_info": _statusDeprecated ?: RCTReachabilityStateUnknown});
+    SCNetworkReachabilityRef reachability = [self getReachabilityRef];
+    SCNetworkReachabilityUnscheduleFromRunLoop(reachability, CFRunLoopGetMain(), kCFRunLoopCommonModes);
+    CFRelease(reachability);
+    resolve(@{@"connectionType": _connectionType ?: RCTConnectionTypeUnknown,
+              @"effectiveConnectionType": _effectiveConnectionType ?: RCTEffectiveConnectionTypeUnknown,
+              @"network_info": _statusDeprecated ?: RCTReachabilityStateUnknown});
 }
 
 @end
